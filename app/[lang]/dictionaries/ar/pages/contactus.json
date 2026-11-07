@@ -1,0 +1,27 @@
+{
+  "title": "تواصل مع",
+  "messagePlaceholder": "رسالتك",
+  "help": "كيف يمكننا المساعدة؟",
+  "ask": "اسأل عن Cello Graphics.",
+  "signIn": "يرجى تسجيل الدخول للدردشة مع محمد.",
+  "aiExplain": "محمد مساعد ذكاء اصطناعي.",
+  "aiTitle": "مساعد Cello Graphics",
+  "aiAssistent": "مساعد الذكاء الاصطناعي",
+  "continue": "متابعة التوليد",
+  "suggestions": [
+    "ما هي الخدمات التي تقدمونها؟",
+    "أرني خططكم",
+    "هل تقومون بالتوظيف؟"
+  ],
+  "unAvailableMessage": "محمد غير متاح حاليا",
+  "signInMessage": "يرجى تسجيل الدخول للدردشة مع محمد.",
+  "emptyMessage": "الرسالة فارغة أو طويلة جدًا.",
+  "noContinueMessage": "لا يوجد شيء لمتابعته.",
+  "streamMessage": "فشل بث محمد.",
+  "saveMessage": "فشل حفظ محمد.",
+  "requestMessage": "فشل طلب محمد.",
+  "historyMessage": "فشل تحميل سجل الدردشة.",
+  "loadMessage": "تعذّر تحميل الدردشة.",
+  "clearMessage": "فشل مسح الدردشة.",
+  "runFailedMessage": "فشل إكمال تشغيل محمد."
+}

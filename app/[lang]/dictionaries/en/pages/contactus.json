@@ -1,0 +1,27 @@
+{
+  "title": "Contact",
+  "messagePlaceholder": "Message",
+  "help": "How can we help?",
+  "ask": "Ask about Cello graphics.",
+  "signIn": "Please sign in to chat with Mohammad.",
+  "aiExplain": "Mohammad is an AI assistant.",
+  "aiTitle": "Cello Graphics Assistant",
+  "aiAssistent": "AI assistant",
+  "continue": "Continue generating",
+  "suggestions": [
+    "What services do you offer?",
+    "Show me your plans",
+    "Are you hiring?"
+  ],
+  "unAvailableMessage": "Mohammad is currently unavailable.",
+  "signInMessage": "Please sign in to chat with Mohammad.",
+  "emptyMessage": "The message is empty or too long.",
+  "noContinueMessage": "There is nothing to continue.",
+  "streamMessage": "Mohammad stream failed.",
+  "saveMessage": "Mohammad save failed.",
+  "requestMessage": "Mohammad request failed.",
+  "historyMessage": "Loading chat history failed.",
+  "loadMessage": "Could not load the chat.",
+  "clearMessage": "Clearing chat failed.",
+  "runFailedMessage": "Mohammad run completion failed"
+}
