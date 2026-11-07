@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -9,9 +8,753 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Gender {
+  Male
+  Female
+}
+
+enum ProviderType {
+  GOOGLE
+  CREDENTIALS
+}
+
+type Provider {
+  type     ProviderType
+  verified DateTime?
+}
+
+type conditions {
+  age  Int?
+  forClient Boolean?
+  gender Gender?
+}
+
+model Offer {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  nameAR String 
+  nameEN String @unique
+  code String  @unique
+  models String[]
+  shortDetailsAR String 
+  shortDetailsEN String
+  detailsAR String
+  detailsEN String
+  duration Int
+  extended Int? 
+  expiresAt DateTime @default(now())
+  reActivate Boolean @default(false)
+  createdAt DateTime @default(now())
+  price Float
+  conditions conditions
+  offerSubscriptions OfferSubscriber[]
+  isActive Boolean @default(true)
+}
+
+model role {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  nameEN    String
+  nameAR    String
+  code      String @unique
+  detailsEN String?
+  lock      Boolean @default(false)
+  detailsAR String?
+  userIds   String[] @db.ObjectId
+  users     User[] @relation(fields: [userIds],references: [id])
+  permissionsIds        String[] @db.ObjectId
+  permissions           permission[] @relation(fields: [permissionsIds],references: [id])
+  isActive  Boolean @default(true)
+}
+
+model permission {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  nameEN         String 
+  nameAR         String 
+  code           String   @unique
+  detailsEN      String?
+  detailsAR      String?
+  roleIds        String[] @db.ObjectId
+  roles          role[]   @relation(fields: [roleIds],references: [id])
+  userIds        String[] @db.ObjectId
+  users          User[]   @relation(fields: [userIds],references: [id])
+}
+
+model Feature {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug          String   @unique
+  nameEN        String   
+  nameAR        String   
+  descriptionEN String?
+  descriptionAR String?  
+  type          String    @default("consume")   
+  aggregatedLimits    UserAggregatedLimit []    
+  limits    SubscriptionFeature []   
+  planFeatures        PlanFeature []     
+  usages              SubscriptionUsage[]  
+
+}
+model Plan {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  nameEN          String
+  nameAR          String
+  slug            String   @unique
+  descriptionEN   String?
+  descriptionAR   String?
+  price           Float    @default(0)
+  billingInterval String   @default("monthly") 
+  isActive        Boolean  @default(true) 
+  createdAt       DateTime @default(now()) 
+  updatedAt       DateTime @updatedAt
+  service         Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  serviceId       String   @db.ObjectId    
+  offers          OfferOnPlan []   
+  planFeatures        PlanFeature []   
+  subscriptions   Subscription[]
+}
+model PlanFeature {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  planId      String   @db.ObjectId 
+  featureId   String   @db.ObjectId 
+  limit       Int
+  isActive    Boolean  @default(true) 
+  createdAt   DateTime @default(now()) 
+
+  plan        Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature     Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureId])
+}
+model Subscription {
+  id                  String       @id @default(auto())  @map("_id") @db.ObjectId
+  userId              String       @db.ObjectId 
+  planId              String       @db.ObjectId 
+  status              String       @default("active") // active, cancelled, expired, trialing
+  startsAt            DateTime  
+  paidAmount          Float      
+  offerOnPlanId       String?       @db.ObjectId 
+  endsAt              DateTime
+  createdAt           DateTime      @default(now()) 
+  updatedAt           DateTime      @updatedAt
+  isActive            Boolean       @default(true) 
+  priority            Int           @default(0)
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade) // assume User model exists
+  plan                Plan          @relation(fields: [planId], references: [id])
+  offer               OfferOnPlan?  @relation(fields: [offerOnPlanId], references: [id], onDelete: Cascade)
+  
+  limits              SubscriptionFeature[]    // usage tracking per feature
+  usages              SubscriptionUsage[]     // usage tracking per feature
+}
+model SubscriptionFeature {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId String   @db.ObjectId 
+  featureId      String   @db.ObjectId 
+  limit          Int
+  isActive       Boolean  @default(true) 
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt 
+  status         String       @default("pending") 
+  
+  feature       Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, featureId])
+}
+model SubscriptionUsage {
+  id             String   @id @default(auto())  @map("_id") @db.ObjectId
+  subscriptionId String   @db.ObjectId 
+  featureId      String   @db.ObjectId 
+  currentUsage   Int      @default(0) 
+  createdAt      DateTime @default(now())
+  isActive       Boolean  @default(true) 
+  updatedAt      DateTime @updatedAt 
+
+  feature       Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, featureId])
+}
+
+model UserAggregatedLimit {
+  id                      String    @id @default(auto())  @map("_id") @db.ObjectId
+  userId                  String    @db.ObjectId 
+  featureId               String   @db.ObjectId 
+  totalLimit              Int       
+  projectCount            Int      @default(0)
+  subscriptionId          String   @db.ObjectId 
+  expireDate              DateTime 
+  updatedAt               DateTime  @updatedAt 
+  user                    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature                 Feature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, featureId])
+}
+
+
+model OfferOnPlan {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  percentageOffer Int          
+  offerEndDate    DateTime 
+  createdAt       DateTime       @default(now())
+  planId          String         @db.ObjectId 
+  isActive        Boolean        @default(true) 
+  plan            Plan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  subscriptions   Subscription[] 
+  
+}
+
+
+model sequenceNumber {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  code     String   @unique
+  number   Int      @default(0)
+}
+
 model User {
-  id   String      @id @default(auto()) @map("_id") @db.ObjectId
- }
+  id                    String      @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String      @default("user")
+  username              String      @unique @default(uuid())
+  age                   DateTime?
+  gender                Gender?
+  email                 String      @unique
+  password              String? 
+  image                 String?
+  phoneNumber           String?
+  location              String?
+  city                  String?
+  jobTitleEN            String?
+  jobTitleAR            String?
+  detailsEN             String?  
+  detailsAR             String?  
+  providers             Provider[]
+  roleIds               String[]     @db.ObjectId
+  roles                 role[]       @relation(fields: [roleIds],references: [id])
+  subscriptions         Subscription[]
+  aggregatedLimits      UserAggregatedLimit[]
+
+  permissionIds         String[]     @db.ObjectId
+  permission            permission[] @relation(fields: [permissionIds],references: [id])
+  verifiedClientStatus  Int          @default(0)        //  1 means client request , 2 means client verified , 0 means the default
+  interestedServiceIds  String[]     @db.ObjectId
+  interestedServices    Service[]    @relation(fields: [interestedServiceIds], references: [id])
+  teamMember            TeamMember?  //who make projects .teams of the services
+  ownedProjectIds       String[]     @db.ObjectId //the projects that the users uploaded
+  ownedProjects         Project[]    @relation("ProjectTeam", fields: [ownedProjectIds], references: [id])
+  clientProjects        Project[]    @relation("projectClient")  // Projects where this user is the client
+  uploadedProjects      Project[]    @relation("ProjectUploader")
+  comments              Comment[]
+  ratings               Rating[]
+  votes                 Vote[]
+  purchase              Purchase[]
+  emailToSection        EmailToSection[]
+  contactMessages        ContactMessage[]
+  sentEmails            EmailToExpert[] @relation("emailSender")
+  receivedEmails        EmailToExpert[] @relation("emailExpert")
+  verificationRequest   VerificationRequest? @relation("verificationRequest")
+  lastLogin             DateTime?
+  createdAt             DateTime        @default(now())
+  notifications         Notification[]
+  offerSubscriptions    OfferSubscriber[]
+  investor              Boolean         @default(false)
+}
+
+model Purchase{
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  requestedAt     DateTime
+  userId          String   
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  projectId       String   
+  project         Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+}
+model OfferSubscriber {
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  requestedAt   DateTime
+  userId        String     @db.ObjectId
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  status        messageType
+  offerId       String     @db.ObjectId
+  offer         Offer      @relation(fields: [offerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  @@index([userId,offerId])
+}
+enum messageType {
+  pending
+  in_progress
+  resolved
+  closed
+}
+enum NotificationSource {
+  emailToExpert
+  emailToSection
+  OfferSubscriber
+  contactMessage
+  verificationRequest
+  general
+}
+model ContactMessage {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  EmailedAt     DateTime
+  senderId      String       @db.ObjectId
+  sender        User         @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  message       String
+ @@index([senderId])
+}
+model EmailToSection {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  EmailedAt     DateTime
+  senderId      String    @db.ObjectId
+  sender        User      @relation(fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  status        messageType
+  message       String
+  sectionId     String     @db.ObjectId
+  section       Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  @@index([senderId])
+}
+model EmailToExpert {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  EmailedAt    DateTime
+  senderId     String @db.ObjectId
+  message      String
+  status       messageType
+  sender       User   @relation("emailSender", fields: [senderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  expertId     String @db.ObjectId  
+  expert       User   @relation("emailExpert", fields: [expertId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  @@index([senderId, expertId])
+}
+model VerificationRequest {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  clientId   String      @unique @db.ObjectId  // Add @unique for one-to-one
+  client     User        @relation("verificationRequest", fields: [clientId], references: [id], onDelete: Cascade)
+  status     messageType
+  createdAt  DateTime    @default(now())
+}
+
+model Notification {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  recipientId    String    @db.ObjectId
+  recipient      User      @relation(fields: [recipientId], references: [id])
+  source    NotificationSource 
+  messageId String?        @db.ObjectId  //link to email to expert or email to section or client notification
+  messageEN   String?   
+  messageAR   String?                     //if the source is general
+  @@index([recipientId])
+}
+model TeamMember {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  expert     Boolean
+  userId     String   @unique @db.ObjectId
+  service    Service @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade) 
+  serviceId  String  @db.ObjectId
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  @@unique([userId,serviceId])
+}
+
+type projectDynamicData {
+  type DynamicForms
+  titleEN String
+  titleAR String
+  valueEN String?
+  valueAR String?
+}
+
+type imageData {
+   url String
+}
+type videoData{
+   url String 
+}
+type audioData{
+   url String 
+
+}
+type documentData{
+   url String 
+}
+enum ImagesExtensionsType {
+  PNG
+  JPEG
+}
+enum AudioExtensionsType {
+  MP3
+  AAC
+  WAV
+  FLAC
+  M4A
+  AIFF
+  WMA
+}
+enum DocumentExtensionsType {
+  PDF
+}
+type imageConfig{
+   maxNumberOfImages Int 
+   maxSizeMb Int
+   allowedExtensions ImagesExtensionsType[]
+   MinWidth Int
+   MaxWidth Int
+   MinHight Int
+   MaxHight Int
+}
+type videoConfig{
+   maxNumberOfVideos Int 
+}
+type audioConfig{
+   maxNumberOfAudio Int  
+   maxSize Int
+   allowedExtensions AudioExtensionsType[]
+}
+type documentConfig{
+  maxNumberOfDocs Int
+  maxSize Int 
+  allowedExtensions DocumentExtensionsType[]
+}
+type configAsset {
+  image imageConfig?
+  audio audioConfig?
+  video videoConfig?
+  document documentConfig?
+}
+type dataAsset {
+  image imageData[]
+  video videoData[]
+  audio audioData[]
+  document documentData[]
+}
+model Project {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  slug           String       @unique
+  nameEN         String
+  nameAR         String
+  descriptionAR  String?
+  descriptionEN  String?
+  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sectionId      String       @db.ObjectId
+  coverImage     String       // S3 URL   
+  purchacable    Boolean
+  assetFiles     dataAsset
+  color          String?   
+  tagsEN         String[]
+  tagsAR         String[]
+  keywordsEN     String[]
+  keywordsAR     String[]
+  projectDynamicData projectDynamicData[]
+  purchase       Purchase[]
+  ownerIds       String[]     @db.ObjectId
+  owners         User[]       @relation("ProjectTeam", fields: [ownerIds], references: [id])
+  client         User?        @relation("projectClient",fields: [clientId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  clientId       String?      @db.ObjectId
+  uploader       User         @relation("ProjectUploader",fields: [uploaderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploaderId     String       @db.ObjectId
+  free           Boolean      @default(true)
+  private        Int          @default(0) //0 a normal project uploaded from cello , 1 a project from a plan ,2 from a susbended plan 
+  comments       Comment[]
+  ratings        Rating[]
+  votes          Vote[]
+  startDate      DateTime? 
+  completionDate DateTime?
+  difficulty     Difficulty?
+  price          Float?
+  createdAt  DateTime @default(now())
+  subscriptionId String?
+  isActive Boolean @default(true)
+}
+
+/// A short-lived note saying "this user already started this download".
+///
+/// Its only job is to stop one intent being charged twice — the user who
+/// dismissed the browser's "Save as" dialog, reloaded, double-clicked, or
+/// opened a second tab. Before charging, the download route looks for a live
+/// note on (userId, projectId) and re-signs against it instead of spending
+/// another credit.
+///
+/// NOT a download history, and deliberately not retained. That a credit was
+/// spent is already recorded by `consume` in SubscriptionUsage and
+/// UserAggregatedLimit; which project it went to goes to the logs. Keeping this
+/// single-purpose is what lets the rows expire themselves.
+///
+/// Rows are removed by MongoDB via a TTL index on `expiresAt`, which Prisma
+/// cannot declare here. `npm run ensure:indexes` creates it and must be run
+/// once per environment — without it nothing ever cleans up.
+model DownloadGrant {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  /// Always present: downloads require an account, so there is no such thing
+  /// as a note that can never be looked up again.
+  userId    String   @db.ObjectId
+  projectId String   @db.ObjectId
+  /// Null when nothing was charged (free project, owner, client, staff).
+  featureId String?  @db.ObjectId
+  charged   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  /// TTL anchor: MongoDB deletes the row once this passes.
+  expiresAt DateTime
+
+  /// The idempotency barrier, not just an index.
+  ///
+  /// Exactly one row may exist per (user, project), so two simultaneous clicks
+  /// race to insert and only one can win — that winner is the request that
+  /// charges. Writing the note after `consume` instead left a window where
+  /// neither request had written one yet when the other looked, and both
+  /// charged. An expired row is recycled in place rather than duplicated.
+  @@unique([userId, projectId])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HART
+}
+
+enum DynamicForms {
+  SHORTTEXT
+  LONGTEXT
+  // COLOR
+  SELECT
+}
+
+type projectData {
+  type    DynamicForms
+  titleEN String
+  titleAR String
+  linkTo  String?
+}
+
+model Section {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  nameEN       String
+  nameAR       String
+  descriptionAR String?
+  descriptionEN String?
+  slug         String     @unique
+  service      Service?   @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  serviceId    String?    @db.ObjectId
+  projects     Project[]
+  projectData  projectData[]        // Service-specific data (scalable JSON object)
+  emailToSection       EmailToSection[]
+  assetsConfigurations     configAsset
+  isActive Boolean @default(true)
+}
+
+model Service {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  nameEN               String
+  nameAR               String
+  slug                 String @unique
+  image                String
+  secondaryImage       String?
+  thirdImage       String?
+  aimEN                String
+  aimAR                String
+  sections             Section[]
+  teamMembers          TeamMember[]
+  interestedUserIds    String[]  @db.ObjectId 
+  interestedUsers      User[]    @relation(fields: [interestedUserIds], references: [id])
+  plans      Plan[]  
+  isActive Boolean @default(true)
+}
+model Comment {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  content    String
+  createdAt  DateTime @default(now())
+
+  type       CommentType @default(OPINION)
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @db.ObjectId
+
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String?   @db.ObjectId
+
+  @@unique([userId, type,projectId])
+}
+
+enum CommentType {
+  PROJECT
+  OPINION
+}
+
+model Rating {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  value      Int      
+  createdAt  DateTime @default(now())
+
+  type       CommentType @default(OPINION)
+
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  
+  projectId  String?   @db.ObjectId
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, type,projectId])
+}
+
+model Vote {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt  DateTime @default(now())
+  userId     String   @db.ObjectId
+  projectId  String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, projectId]) 
+}
+
+model PasswordToken {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  email    String
+  token    String
+  expires  DateTime
+
+  @@unique([email, token])
+}
+
+model VerificationToken {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  email    String
+  token    String
+  expires  DateTime
+  @@unique([email, token])
+}
+
+type socialType {
+  link String
+  name String
+  icon String
+}
+type contact {
+  locationEN String
+  locationAR String
+  phoneNumbers String[]
+}
+type contactInfoType {
+  mails String[]
+  locations contact[]
+}
+type colorsType {
+  color_1 String
+  color_2 String
+  color_3 String
+  color_4 String
+  color_5 String
+  color_6 String
+  color_7 String
+  color_8 String
+  color_9 String
+  color_10 String
+  color_11 String
+  color_12 String
+}
+type iconsType {
+  search String 
+  outlineBasket String 
+  filledBasketBlack String 
+  filledBasketWhite String 
+  download String 
+  commentBlack String 
+  commentWhite String 
+  starBlack String 
+  starWhite String 
+}
+
+model Settings {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  code String @unique @default("onlyRecord")
+  colorPallets colorsType
+  socialLinks socialType[]
+  contactInfo contactInfoType
+  logo1 String 
+  logo2 String 
+  icons iconsType
+}
+
+type Seo {
+  titleEN String
+  titleAR String
+  metaTitleEN    String   
+  metaTitleAR    String
+  metaDescEN     String   
+  metaDescAR     String
+  ogImage        String   
+  keywordsEN     String[] 
+  keywordsAR     String[]
+}
+
+model Attribute {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String
+  type      String
+
+  titleEN   String?
+  titleAR   String?
+  valueEN   String?
+  valueAR   String?
+
+  sectionId String?  @db.ObjectId
+  cardId    String?  @db.ObjectId
+
+  section   SectionsPages? @relation(fields: [sectionId], references: [id])
+  card      Card?    @relation(fields: [cardId], references: [id])
+
+  @@unique([sectionId, key])
+  @@unique([cardId, key])
+}
+
+model Card {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  key           String
+  titleEN       String?
+  titleAR       String?
+  descriptionEN String?
+  descriptionAR String?
+
+  sectionId     String   @db.ObjectId
+  section       SectionsPages  @relation(fields: [sectionId], references: [id])
+
+  attributes    Attribute[]
+
+  @@unique([sectionId, key])
+}
+
+model SectionsPages {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug          String   @unique  
+  titleEN       String?
+  titleAR       String?
+  descriptionEN String?  
+  descriptionAR String?
+  attributes    Attribute[]
+  cards         Card[]   
+  pageId        String?          @db.ObjectId
+  page          Page?           @relation(fields: [pageId], references: [id])
+}
+
+model Page {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug          String   @unique 
+  titleEN       String?
+  titleAR       String?
+  descriptionEN String?
+  descriptionAR String?
+  seo           Seo
+  sections      SectionsPages[]
+}
+type thresholdsValues {
+  title String
+  value Float
+}
+model thresholds {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug          String   @unique 
+  thresholdsValues   thresholdsValues[]         
+}
+model SearchKeyword {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  word  String 
+  @@index([word])
+}
+
+
 model AiMessage {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -21,4 +764,3 @@ model AiMessage {
 
   @@index([userId, createdAt])
 }
-
